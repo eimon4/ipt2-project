@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SwiftTrack - Admin Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="auth.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800">
+  <!-- Dynamic Top Navbar -->
+  <div id="navbar-container"></div>
+
+  <main class="max-w-6xl mx-auto p-4 sm:p-6 mt-4">
+    <!-- Header Title -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div>
+        <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Administrator Dashboard</h1>
+        <p class="text-sm text-gray-500 mt-1">Review student submissions, approve for public feed, or mark as resolved.</p>
+      </div>
+      <div>
+        <button 
+          onclick="loadAllReports()" 
+          class="inline-flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium px-3.5 py-2 rounded shadow-sm transition"
+        >
+          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Refresh Data
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white p-4 rounded shadow-sm border border-gray-100">
+        <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold">Total Reports</p>
+        <p id="stat-total" class="text-2xl font-bold text-gray-900 mt-1">-</p>
+      </div>
+      <div class="bg-white p-4 rounded shadow-sm border border-yellow-200 bg-yellow-50/30">
+        <p class="text-xs text-yellow-700 uppercase tracking-wider font-semibold">Pending Review</p>
+        <p id="stat-pending" class="text-2xl font-bold text-yellow-600 mt-1">-</p>
+      </div>
+      <div class="bg-white p-4 rounded shadow-sm border border-green-200 bg-green-50/30">
+        <p class="text-xs text-green-700 uppercase tracking-wider font-semibold">Approved</p>
+        <p id="stat-approved" class="text-2xl font-bold text-green-600 mt-1">-</p>
+      </div>
+      <div class="bg-white p-4 rounded shadow-sm border border-blue-200 bg-blue-50/30">
+        <p class="text-xs text-blue-700 uppercase tracking-wider font-semibold">Resolved</p>
+        <p id="stat-resolved" class="text-2xl font-bold text-blue-600 mt-1">-</p>
+      </div>
+    </div>
+
+    <!-- Filters & Search Bar -->
+    <div class="bg-white p-4 rounded shadow-sm border border-gray-100 mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div class="w-full md:w-80">
+        <input 
+          type="text" 
+          id="admin-search" 
+          placeholder="Search by title, student, or email..."
+          class="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-800"
+        />
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3 w-full md:w-auto text-sm">
+        <div class="flex items-center gap-1.5">
+          <label for="status-filter" class="text-gray-600 font-medium text-xs">Status:</label>
+          <select id="status-filter" class="border rounded px-2.5 py-1.5 bg-white text-sm focus:outline-none">
+            <option value="all">All Statuses</option>
+            <option value="pending" selected>Pending Review</option>
+            <option value="approved">Approved</option>
+            <option value="missing">✕ Still Missing (Lost &amp; Found)</option>
+            <option value="found">✓ Found / Resolved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+          <label for="category-filter" class="text-gray-600 font-medium text-xs">Category:</label>
+          <select id="category-filter" class="border rounded px-2.5 py-1.5 bg-white text-sm focus:outline-none">
+            <option value="all">All Categories</option>
+            <option value="Lost & Found">Lost &amp; Found</option>
+            <option value="Incident">Incident</option>
+            <option value="Emergency">Emergency</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reports Table Container -->
+    <div class="overflow-x-auto bg-white shadow rounded border border-gray-100">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+          <tr class="text-left text-gray-600 font-semibold">
+            <th class="px-4 py-3">ID</th>
+            <th class="px-4 py-3">Title</th>
+            <th class="px-4 py-3">Category</th>
+            <th class="px-4 py-3">Status</th>
+            <th class="px-4 py-3">Student</th>
+            <th class="px-4 py-3">Email</th>
+            <th class="px-4 py-3">Created</th>
+            <th class="px-4 py-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="admin-table-body">
+          <tr>
+            <td colspan="8" class="px-4 py-8 text-center text-gray-400">Loading incidents...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script>
+    let allReports = [];
+    let currentAdmin = null;
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      // 1. Ensure user is logged in as administrator
+      currentAdmin = await requireAuth('admin');
+      if (!currentAdmin) return;
+
+      // 2. Fetch all reports
+      await loadAllReports();
+
+      // 3. Attach filter event listeners
+      document.getElementById('admin-search').addEventListener('input', renderTable);
+      document.getElementById('status-filter').addEventListener('change', renderTable);
+      document.getElementById('category-filter').addEventListener('change', renderTable);
+    });
+
+    // Fetch all reports from Supabase
+    async function loadAllReports() {
+      const tbody = document.getElementById('admin-table-body');
+      try {
+        if (!isConfigured()) return;
+
+        const { data, error } = await supabaseClient
+          .from('reports')
+          .select('*')
+          .order('id', { ascending: false });
+
+        if (error) throw error;
+
+        allReports = data || [];
+        updateStats();
+        renderTable();
+      } catch (err) {
+        console.error('Error fetching admin reports:', err);
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="px-4 py-6 text-center text-red-500">Failed to load reports: ${err.message}</td>
+          </tr>
+        `;
+      }
+    }
+
+    // Update Quick Stat Counters
+    function updateStats() {
+      document.getElementById('stat-total').textContent = allReports.length;
+      document.getElementById('stat-pending').textContent = allReports.filter(r => r.status === 'pending').length;
+      document.getElementById('stat-approved').textContent = allReports.filter(r => r.status === 'approved').length;
+      document.getElementById('stat-resolved').textContent = allReports.filter(r => r.status === 'resolved').length;
+    }
+
+    // Render table rows based on active search & filters
+    function renderTable() {
+      const tbody = document.getElementById('admin-table-body');
+      const search = document.getElementById('admin-search').value.toLowerCase().trim();
+      const statusFilter = document.getElementById('status-filter').value;
+      const categoryFilter = document.getElementById('category-filter').value;
+
+      const filtered = allReports.filter(report => {
+        const itemStatus = getItemStatus(report);
+        const isFoundOrResolved = (itemStatus === 'Found' || itemStatus === 'Resolved' || report.status === 'resolved');
+
+        let matchesStatus = true;
+        if (statusFilter === 'missing') {
+          matchesStatus = (report.status === 'approved' && !isFoundOrResolved);
+        } else if (statusFilter === 'found') {
+          matchesStatus = isFoundOrResolved;
+        } else if (statusFilter !== 'all') {
+          matchesStatus = (report.status === statusFilter);
+        }
+
+        const matchesCategory = categoryFilter === 'all' || report.category === categoryFilter;
+        const matchesSearch = !search ||
+          (report.title && report.title.toLowerCase().includes(search)) ||
+          (report.user_name && report.user_name.toLowerCase().includes(search)) ||
+          (report.user_email && report.user_email.toLowerCase().includes(search)) ||
+          (itemStatus && itemStatus.toLowerCase().includes(search));
+
+        return matchesStatus && matchesCategory && matchesSearch;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="px-4 py-8 text-center text-gray-400">No reports match the selected filters.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(r => {
+        const isLostFound = (r.category === 'Lost & Found');
+        const itemStatus = getItemStatus(r);
+        const isFoundOrResolved = (itemStatus === 'Found' || itemStatus === 'Resolved' || r.status === 'resolved');
+
+        const dateStr = new Date(r.created_at).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+
+        // Action buttons
+        let actionsHtml = '';
+        if (r.status === 'pending') {
+          actionsHtml = `
+            <button onclick="updateReportStatus(${r.id}, 'approved')" class="text-green-600 hover:text-green-800 font-medium hover:underline mr-2">Approve</button>
+            <button onclick="updateReportStatus(${r.id}, 'rejected')" class="text-red-600 hover:text-red-800 font-medium hover:underline mr-2">Reject</button>
+          `;
+        } else if (r.status === 'approved') {
+          actionsHtml = `
+            <button onclick="updateReportStatus(${r.id}, 'resolved', '${isLostFound ? 'Found' : 'Resolved'}')" class="text-blue-600 hover:text-blue-800 font-medium hover:underline mr-2">
+              ${isLostFound ? 'Mark Found' : 'Mark Resolved'}
+            </button>
+            <button onclick="updateReportStatus(${r.id}, 'rejected')" class="text-red-500 hover:text-red-700 text-xs hover:underline mr-2">Reject</button>
+          `;
+        } else if (r.status === 'resolved') {
+          actionsHtml = `
+            <span class="text-emerald-600 text-xs font-semibold mr-1">${isLostFound ? '✓ Found' : '✓ Resolved'}</span>
+            <button onclick="updateReportStatus(${r.id}, 'approved', '${isLostFound ? 'Still Missing' : 'In Progress'}')" class="text-xs text-blue-600 hover:underline mr-2">
+              ${isLostFound ? '↺ Mark Missing' : '↺ Reopen'}
+            </button>
+          `;
+        } else {
+          actionsHtml = `
+            <span class="text-red-400 italic mr-1">Rejected</span>
+            <button onclick="updateReportStatus(${r.id}, 'pending')" class="text-xs text-blue-600 hover:underline mr-2">Reconsider</button>
+          `;
+        }
+        actionsHtml += `<button onclick="adminDeleteReport(${r.id})" class="text-gray-400 hover:text-red-600 text-xs hover:underline" title="Delete report permanently">✕ Delete</button>`;
+
+        return `
+          <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
+            <td class="px-4 py-3 font-mono text-xs text-gray-500">#${r.id}</td>
+            <td class="px-4 py-3">
+              <a href="view_report.html?id=${r.id}" class="text-gray-900 font-medium hover:text-blue-600 hover:underline">
+                ${escapeHtml(r.title)}
+              </a>
+              ${r.image_url ? '<span class="inline-block ml-1 text-xs text-blue-500" title="Includes supporting image">📷</span>' : ''}
+            </td>
+            <td class="px-4 py-3 text-xs text-gray-600">${escapeHtml(r.category || 'Incident')}</td>
+            <td class="px-4 py-3">
+              ${renderStatusBadge(r)}
+            </td>
+            <td class="px-4 py-3 text-gray-800 font-medium">${escapeHtml(r.user_name || 'Anonymous')}</td>
+            <td class="px-4 py-3 text-gray-500 text-xs">${escapeHtml(r.user_email || '-')}</td>
+            <td class="px-4 py-3 text-gray-400 text-xs">${dateStr}</td>
+            <td class="px-4 py-3 text-xs whitespace-nowrap">
+              ${actionsHtml}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Function to update report status in Supabase
+    async function updateReportStatus(reportId, newStatus, newItemStatus = null) {
+      const confirmAction = confirm(`Are you sure you want to change the status of Report #${reportId}?`);
+      if (!confirmAction) return;
+
+      try {
+        const r = allReports.find(x => x.id === reportId);
+        const isLostFound = (r?.category === 'Lost & Found');
+        const finalItemStatus = newItemStatus || (newStatus === 'resolved' ? (isLostFound ? 'Found' : 'Resolved') : (isLostFound ? 'Still Missing' : 'In Progress'));
+
+        await updateReportItemStatus(reportId, finalItemStatus, newStatus);
+
+        // Update local state and re-render
+        if (r) {
+          r.status = newStatus;
+          r.item_status = finalItemStatus;
+        }
+
+        updateStats();
+        renderTable();
+      } catch (err) {
+        alert('Failed to update status: ' + err.message);
+      }
+    }
+
+    // Delete report as administrator
+    async function adminDeleteReport(reportId) {
+      const r = allReports.find(x => x.id === reportId);
+      const title = r ? r.title : 'this report';
+      if (!confirm(`Are you sure you want to permanently delete "${title}"?\n\nThis action cannot be undone.`)) return;
+
+      try {
+        await deleteReportById(reportId);
+        allReports = allReports.filter(x => x.id !== reportId);
+        updateStats();
+        renderTable();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  </script>
+</body>
+</html>
+

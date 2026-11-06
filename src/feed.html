@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SwiftTrack - School Reports Feed</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="auth.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800">
+  <!-- Dynamic Top Navbar populated by auth.js -->
+  <div id="navbar-container"></div>
+
+  <main class="max-w-5xl mx-auto p-4 sm:p-6 mt-4">
+    <!-- Header Hero Section -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div>
+        <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">School Reports Feed</h1>
+        <p class="text-sm text-gray-500 mt-1">
+          Stay informed about campus incidents, lost &amp; found items, and official announcements.
+        </p>
+      </div>
+      <div>
+        <a 
+          href="report.html" 
+          class="inline-flex items-center gap-2 bg-blue-900 hover:bg-blue-800 text-white font-medium px-4 py-2 rounded shadow-sm transition"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+          </svg>
+          Submit Report
+        </a>
+      </div>
+    </div>
+
+    <!-- Search & Category Filters -->
+    <div class="bg-white p-4 rounded shadow-sm border border-gray-100 mb-6 space-y-3">
+      <!-- Search input -->
+      <div>
+        <label for="search-input" class="sr-only">Search reports</label>
+        <div class="relative">
+          <input 
+            type="text" 
+            id="search-input" 
+            placeholder="Search reports by keyword (e.g. ID, umbrella, cafeteria, scuffle)..."
+            class="w-full pl-10 pr-4 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-800"
+          />
+          <svg class="w-4 h-4 text-gray-400 absolute left-3 top-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Filter Buttons -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 text-xs sm:text-sm">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-gray-500 font-medium mr-1">Category:</span>
+          <button onclick="setCategory('All')" id="cat-All" class="category-btn bg-blue-900 text-white px-3 py-1 rounded-full font-medium transition">All</button>
+          <button onclick="setCategory('Lost & Found')" id="cat-Lost & Found" class="category-btn bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1 rounded-full font-medium transition">Lost &amp; Found</button>
+          <button onclick="setCategory('Incident')" id="cat-Incident" class="category-btn bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1 rounded-full font-medium transition">Incident</button>
+          <button onclick="setCategory('Emergency')" id="cat-Emergency" class="category-btn bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1 rounded-full font-medium transition">Emergency</button>
+          <button onclick="setCategory('Other')" id="cat-Other" class="category-btn bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1 rounded-full font-medium transition">Other</button>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-1.5 border-t sm:border-t-0 sm:border-l sm:pl-3 border-gray-200 pt-2 sm:pt-0">
+          <span class="text-gray-500 font-medium mr-1">Status:</span>
+          <button onclick="setStatusFilter('all')" id="status-all" class="status-btn bg-gray-800 text-white px-2.5 py-0.5 rounded-full text-xs font-medium transition">All</button>
+          <button onclick="setStatusFilter('missing')" id="status-missing" class="status-btn bg-gray-100 text-gray-700 hover:bg-gray-200 px-2.5 py-0.5 rounded-full text-xs font-medium transition">✕ Still Missing / Open</button>
+          <button onclick="setStatusFilter('found')" id="status-found" class="status-btn bg-gray-100 text-gray-700 hover:bg-gray-200 px-2.5 py-0.5 rounded-full text-xs font-medium transition">✓ Already Found / Solved</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feed Container -->
+    <div id="feed-loading" class="text-center py-12 text-gray-500">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-900 border-t-transparent mb-2"></div>
+      <p>Loading reports feed...</p>
+    </div>
+
+    <div id="feed-list" class="space-y-4"></div>
+
+    <div id="empty-state" class="hidden text-center py-16 bg-white rounded shadow-sm border border-gray-100 p-8">
+      <svg class="w-16 h-16 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+      </svg>
+      <h3 class="text-lg font-semibold text-gray-700">No reports found</h3>
+      <p class="text-sm text-gray-500 mt-1">There are no reports matching your current filter.</p>
+    </div>
+  </main>
+
+  <script>
+    // State variables
+    let allReports = [];
+    let currentUser = null;
+    let selectedCategory = 'All';
+    let selectedStatus = 'all';
+    let searchQuery = '';
+
+    // Initialize Page
+    window.addEventListener('DOMContentLoaded', async () => {
+      // Ensure user is logged in
+      currentUser = await requireAuth();
+      if (!currentUser) return;
+
+      // Fetch reports from Supabase
+      await fetchReports();
+
+      // Setup Search Listener
+      const searchInput = document.getElementById('search-input');
+      searchInput.addEventListener('input', (e) => {
+        searchQuery = e.target.value.toLowerCase().trim();
+        renderFeed();
+      });
+    });
+
+    // 1. Fetch only Approved or Resolved reports from Supabase
+    async function fetchReports() {
+      const feedLoading = document.getElementById('feed-loading');
+      feedLoading.classList.remove('hidden');
+
+      try {
+        if (!isConfigured()) {
+          feedLoading.innerHTML = '<p class="text-amber-600">Please configure your Supabase credentials in <code>supabase-config.js</code>.</p>';
+          return;
+        }
+
+        // We show approved or resolved reports on the public student feed
+        const { data, error } = await supabaseClient
+          .from('reports')
+          .select('*')
+          .in('status', ['approved', 'resolved'])
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        allReports = data || [];
+        renderFeed();
+      } catch (err) {
+        console.error('Error fetching reports:', err);
+        feedLoading.innerHTML = `<p class="text-red-600">Failed to load reports: ${err.message}</p>`;
+      } finally {
+        feedLoading.classList.add('hidden');
+      }
+    }
+
+    // 2. Set Category Filter
+    function setCategory(category) {
+      selectedCategory = category;
+
+      document.querySelectorAll('.category-btn').forEach(btn => {
+        btn.className = 'category-btn bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1 rounded-full font-medium transition';
+      });
+
+      const activeBtn = document.getElementById(`cat-${category}`);
+      if (activeBtn) {
+        activeBtn.className = 'category-btn bg-blue-900 text-white px-3 py-1 rounded-full font-medium transition';
+      }
+
+      renderFeed();
+    }
+
+    // Set Status Filter (all / missing / found)
+    function setStatusFilter(status) {
+      selectedStatus = status;
+
+      document.querySelectorAll('.status-btn').forEach(btn => {
+        btn.className = 'status-btn bg-gray-100 text-gray-700 hover:bg-gray-200 px-2.5 py-0.5 rounded-full text-xs font-medium transition';
+      });
+
+      const activeBtn = document.getElementById(`status-${status}`);
+      if (activeBtn) {
+        activeBtn.className = 'status-btn bg-gray-800 text-white px-2.5 py-0.5 rounded-full text-xs font-medium transition';
+      }
+
+      renderFeed();
+    }
+
+    // 3. Render filtered reports
+    function renderFeed() {
+      const feedList = document.getElementById('feed-list');
+      const emptyState = document.getElementById('empty-state');
+
+      // Filter by category, status, and search keyword
+      const filtered = allReports.filter(report => {
+        const matchesCategory = selectedCategory === 'All' || report.category === selectedCategory;
+        
+        // Status filter check
+        const itemStatus = getItemStatus(report);
+        const isFoundOrResolved = (itemStatus === 'Found' || itemStatus === 'Resolved' || report.status === 'resolved');
+        
+        let matchesStatus = true;
+        if (selectedStatus === 'missing') {
+          matchesStatus = !isFoundOrResolved;
+        } else if (selectedStatus === 'found') {
+          matchesStatus = isFoundOrResolved;
+        }
+
+        const matchesSearch = !searchQuery || 
+          (report.title && report.title.toLowerCase().includes(searchQuery)) ||
+          (report.description && report.description.toLowerCase().includes(searchQuery)) ||
+          (report.category && report.category.toLowerCase().includes(searchQuery)) ||
+          (report.user_name && report.user_name.toLowerCase().includes(searchQuery)) ||
+          (itemStatus && itemStatus.toLowerCase().includes(searchQuery));
+
+        return matchesCategory && matchesStatus && matchesSearch;
+      });
+
+      if (filtered.length === 0) {
+        feedList.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+
+      feedList.innerHTML = filtered.map(report => {
+        // Category Badge colors
+        let catColor = 'bg-gray-100 text-gray-700';
+        if (report.category === 'Lost & Found') catColor = 'bg-indigo-50 text-indigo-700 border border-indigo-200';
+        if (report.category === 'Incident') catColor = 'bg-amber-50 text-amber-700 border border-amber-200';
+        if (report.category === 'Emergency') catColor = 'bg-red-50 text-red-700 border border-red-200';
+
+        // Status Badge using shared helper
+        const statusBadge = renderStatusBadge(report);
+
+        // Format Date
+        const dateObj = new Date(report.created_at);
+        const formattedDate = dateObj.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+
+        return `
+          <article class="bg-white rounded-lg shadow-sm border border-gray-100 p-5 sm:p-6 transition hover:shadow-md">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div class="flex items-center gap-2">
+                <span class="text-xs px-2.5 py-0.5 rounded-full font-medium ${catColor}">${escapeHtml(report.category || 'Incident')}</span>
+                ${statusBadge}
+              </div>
+              <time class="text-xs text-gray-400">${formattedDate}</time>
+            </div>
+
+            <h2 class="text-lg sm:text-xl font-bold text-gray-900 mb-2">
+              <a href="view_report.html?id=${report.id}" class="hover:text-blue-900 transition">
+                ${escapeHtml(report.title)}
+              </a>
+            </h2>
+
+            <p class="text-sm text-gray-600 leading-relaxed mb-4 whitespace-pre-line">
+              ${escapeHtml(report.description)}
+            </p>
+
+            ${report.image_url ? `
+              <div class="mb-4">
+                <a href="${escapeHtml(report.image_url)}" target="_blank" rel="noopener noreferrer">
+                  <img 
+                    src="${escapeHtml(report.image_url)}" 
+                    alt="Supporting Image" 
+                    class="max-h-80 w-auto rounded border border-gray-200 object-cover hover:opacity-95 transition"
+                    loading="lazy"
+                  />
+                </a>
+              </div>
+            ` : ''}
+
+            <div class="pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+              <div class="flex items-center gap-2">
+                <span>Reported by: <strong class="text-gray-700">${escapeHtml(report.user_name || 'Anonymous Student')}</strong></span>
+                ${currentUser && currentUser.id === report.user_id ? '<span class="bg-blue-50 text-blue-700 text-[10px] px-1.5 py-0.5 rounded font-medium">You</span>' : ''}
+              </div>
+
+              <div>
+                <a href="view_report.html?id=${report.id}" class="text-blue-600 hover:text-blue-800 font-medium hover:underline">
+                  View Full Details &rarr;
+                </a>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('');
+    }
+  </script>
+</body>
+</html>
+

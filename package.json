@@ -1,0 +1,9 @@
+{
+  "name": "swifttrack",
+  "version": "1.0.0",
+  "description": "SwiftTrack School Reporting System",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
+
