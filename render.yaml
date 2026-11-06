@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: swifttrack
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: ./src

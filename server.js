@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'src');
 
 const MIME_TYPES = {
@@ -46,7 +46,7 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running at: http://localhost:${PORT}/`);
   console.log(`Open School Feed:  http://localhost:${PORT}/feed.html`);
 });
